@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grid World — 純前端版</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:      #0d0f14;
+  --surface: #151820;
+  --border:  #252a38;
+  --accent:  #00e5ff;
+  --purple:  #7c3aed;
+  --text:    #e4e8f0;
+  --muted:   #6b7280;
+  --green:   #22c55e;
+  --red:     #ef4444;
+  --yellow:  #f59e0b;
+  --cell-bg: #181c28;
+}
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Noto Sans TC', sans-serif;
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; padding: 1.4rem 1rem 4rem;
+}
+header { text-align: center; margin-bottom: 1.5rem; }
+header h1 {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(1.3rem, 3vw, 2rem); letter-spacing: .07em;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+header p { color: var(--muted); font-size: .8rem; margin-top: .25rem; }
+.tags { display: flex; gap: .4rem; justify-content: center; margin-top: .4rem; flex-wrap: wrap; }
+.tag {
+  display: inline-block;
+  border-radius: 99px; font-family: 'Space Mono', monospace;
+  font-size: .66rem; padding: .1rem .5rem;
+}
+.tag-cyan   { background: rgba(0,229,255,.1);   border: 1px solid rgba(0,229,255,.28);   color: var(--accent); }
+.tag-yellow { background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.3);  color: #fbbf24; }
+
+.main { display: flex; gap: 1.4rem; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+
+/* panel */
+.panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 1.3rem; width: 230px;
+  display: flex; flex-direction: column; gap: .9rem;
+  position: sticky; top: 1rem;
+}
+.panel-title {
+  font-family: 'Space Mono', monospace; font-size: .68rem;
+  letter-spacing: .12em; color: var(--accent); text-transform: uppercase;
+  border-bottom: 1px solid var(--border); padding-bottom: .45rem;
+}
+label { font-size: .78rem; color: var(--muted); display: block; margin-bottom: .25rem; }
+.n-btn-row { display: flex; gap: .35rem; }
+.n-btn {
+  flex: 1; padding: .45rem 0; border-radius: 8px;
+  border: 2px solid var(--border); background: transparent;
+  color: var(--muted); font-family: 'Space Mono', monospace;
+  font-size: .85rem; cursor: pointer; transition: all .14s;
+}
+.n-btn:hover { border-color: var(--accent); color: var(--text); }
+.n-btn.active { border-color: var(--accent); background: rgba(0,229,255,.1); color: var(--accent); }
+
+.mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .35rem; }
+.mode-btn {
+  padding: .45rem .2rem; border-radius: 8px; border: 2px solid var(--border);
+  background: transparent; color: var(--muted); font-size: .72rem;
+  cursor: pointer; transition: all .14s;
+  display: flex; flex-direction: column; align-items: center; gap: .18rem;
+}
+.mode-btn .icon { font-size: 1rem; }
+.mode-btn:hover { border-color: rgba(0,229,255,.5); color: var(--text); }
+.mode-btn.m-start { border-color: var(--green);  background: rgba(34,197,94,.1);  color: var(--green); }
+.mode-btn.m-goal  { border-color: var(--red);    background: rgba(239,68,68,.1);  color: var(--red); }
+.mode-btn.m-obs   { border-color: #4b5563;        background: rgba(75,85,99,.18);  color: #9ca3af; }
+.mode-btn.m-clear { border-color: var(--accent);  background: rgba(0,229,255,.07); color: var(--accent); }
+
+.status-box {
+  background: rgba(0,0,0,.22); border: 1px solid var(--border);
+  border-radius: 8px; padding: .55rem .75rem; font-size: .76rem;
+}
+.status-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: .18rem; }
+.status-row:last-child { margin-bottom: 0; }
+.sl { color: var(--muted); }
+.sv { font-family: 'Space Mono', monospace; font-size: .7rem; }
+
+.steps { display: flex; gap: .35rem; align-items: center; justify-content: center; }
+.step-dot {
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 2px solid var(--border); background: transparent;
+  font-family: 'Space Mono', monospace; font-size: .6rem; color: var(--muted);
+  display: flex; align-items: center; justify-content: center; transition: all .2s;
+}
+.step-dot.done   { background: var(--green);  border-color: var(--green);  color: #fff; }
+.step-dot.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.step-line { flex: 1; height: 2px; background: var(--border); border-radius: 1px; transition: background .2s; }
+.step-line.done  { background: var(--green); }
+
+.btn {
+  width: 100%; padding: .6rem; border-radius: 8px; border: none;
+  font-family: 'Space Mono', monospace; font-size: .76rem;
+  letter-spacing: .04em; cursor: pointer; transition: all .14s;
+}
+.btn-step1 { background: linear-gradient(135deg,#f59e0b,#d97706); color: #fff; }
+.btn-step1:hover { opacity: .85; transform: translateY(-1px); }
+.btn-step1:disabled { opacity: .3; cursor: not-allowed; transform: none; }
+.btn-step2 { background: linear-gradient(135deg, var(--accent), var(--purple)); color: #fff; }
+.btn-step2:hover { opacity: .85; transform: translateY(-1px); }
+.btn-step2:disabled { opacity: .3; cursor: not-allowed; transform: none; }
+.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+.btn-ghost:hover { border-color: var(--red); color: var(--red); }
+.step-btns { display: flex; flex-direction: column; gap: .5rem; }
+
+/* reward info box */
+.reward-box {
+  background: rgba(0,0,0,.2); border: 1px solid var(--border);
+  border-radius: 8px; padding: .5rem .75rem; font-size: .72rem;
+}
+.reward-row { display: flex; justify-content: space-between; margin-bottom: .15rem; }
+.reward-row:last-child { margin-bottom: 0; }
+.rl { color: var(--muted); }
+.rv { font-family: 'Space Mono', monospace; }
+
+.legend { display: flex; flex-direction: column; gap: .28rem; }
+.leg { display: flex; align-items: center; gap: .45rem; font-size: .72rem; color: var(--muted); }
+.swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+/* grids */
+.grids-area { display: flex; flex-direction: column; gap: 1.8rem; }
+.grid-section { display: flex; flex-direction: column; align-items: center; gap: .55rem; }
+.grid-section-title {
+  font-family: 'Space Mono', monospace; font-size: .75rem;
+  letter-spacing: .08em; padding: .28rem .9rem;
+  border-radius: 99px; display: flex; align-items: center; gap: .5rem;
+}
+.title-hw12 { background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.3); color: #fbbf24; }
+.title-hw13 { background: rgba(124,58,237,.14); border: 1px solid rgba(124,58,237,.38); color: #a78bfa; }
+.grid-badge {
+  font-size: .6rem; padding: .08rem .35rem;
+  border-radius: 99px; font-family: 'Space Mono', monospace;
+}
+.badge-hw12 { background: rgba(245,158,11,.2); color: #fbbf24; }
+.badge-hw13 { background: rgba(124,58,237,.2); color: #a78bfa; }
+
+.grid-wrap { display: grid; gap: 3px; user-select: none; }
+
+.cell {
+  width: 74px; height: 74px;
+  background: var(--cell-bg); border: 2px solid var(--border);
+  border-radius: 8px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  cursor: pointer; transition: border-color .12s, background .2s, transform .1s;
+  position: relative; overflow: hidden;
+}
+.cell:hover:not(.obstacle):not(.readonly) { border-color: rgba(0,229,255,.55); transform: scale(1.05); z-index: 2; }
+.cell.start    { background: rgba(34,197,94,.18);  border-color: var(--green)  !important; }
+.cell.goal     { background: rgba(239,68,68,.18);   border-color: var(--red)    !important; }
+.cell.obstacle { background: rgba(40,45,60,.8);    border-color: #2d3446       !important; cursor: not-allowed; }
+.cell.on-path  { border-color: var(--yellow) !important; box-shadow: 0 0 7px rgba(245,158,11,.35); }
+.cell.on-path.start { border-color: var(--green) !important; box-shadow: 0 0 10px rgba(34,197,94,.5); }
+.cell.on-path.goal  { border-color: var(--red)   !important; box-shadow: 0 0 10px rgba(239,68,68,.5); }
+.cell.readonly { cursor: default; }
+.cell.readonly:hover { transform: none !important; border-color: var(--border) !important; }
+.cell.readonly.start:hover   { border-color: var(--green)  !important; }
+.cell.readonly.goal:hover    { border-color: var(--red)    !important; }
+.cell.readonly.on-path:hover { border-color: var(--yellow) !important; }
+
+.cell-lbl {
+  position: absolute; top: 3px; left: 4px;
+  font-size: .48rem; font-family: 'Space Mono', monospace;
+  color: rgba(255,255,255,.18); line-height: 1; pointer-events: none;
+}
+.cell-arrow {
+  font-size: 1.9rem; line-height: 1; color: #e4e8f0; pointer-events: none;
+}
+.cell.obstacle .cell-arrow { display: none; }
+.cell-val {
+  font-family: 'Space Mono', monospace; font-size: .56rem;
+  color: rgba(200,215,235,.55); margin-top: 2px; line-height: 1; pointer-events: none;
+}
+.cell.obstacle .cell-val { display: none; }
+.cell.obstacle::after {
+  content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    45deg, transparent, transparent 4px,
+    rgba(255,255,255,.04) 4px, rgba(255,255,255,.04) 6px
+  );
+}
+
+#toast {
+  position: fixed; bottom: 1.5rem; left: 50%;
+  transform: translateX(-50%) translateY(55px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 99px; padding: .45rem 1.1rem; font-size: .78rem;
+  transition: transform .26s cubic-bezier(.34,1.56,.64,1), opacity .26s;
+  opacity: 0; z-index: 999; white-space: nowrap;
+}
+#toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+@media (max-width: 680px) {
+  .cell { width: 54px; height: 54px; }
+  .cell-arrow { font-size: 1.4rem; }
+  .panel { width: 100%; position: static; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Grid World</h1>
+  <p>純前端版 · 無需後端伺服器</p>
+  <div class="tags">
+    <span class="tag tag-cyan">HW1-1 · HW1-2 · HW1-3</span>
+    <span class="tag tag-yellow">Standalone</span>
+  </div>
+</header>
+
+<div class="main">
+
+  <aside class="panel">
+    <div class="panel-title">⚙ 設定</div>
+
+    <div>
+      <label>網格大小 n × n</label>
+      <div class="n-btn-row">
+        <button class="n-btn active" onclick="setN(5)">5</button>
+        <button class="n-btn" onclick="setN(6)">6</button>
+        <button class="n-btn" onclick="setN(7)">7</button>
+        <button class="n-btn" onclick="setN(8)">8</button>
+        <button class="n-btn" onclick="setN(9)">9</button>
+      </div>
+    </div>
+
+    <div>
+      <label>點擊模式</label>
+      <div class="mode-grid">
+        <button class="mode-btn m-start" id="btn-start" onclick="setMode('start')">
+          <span class="icon">🟢</span>起始點
+        </button>
+        <button class="mode-btn" id="btn-goal" onclick="setMode('goal')">
+          <span class="icon">🔴</span>目標點
+        </button>
+        <button class="mode-btn" id="btn-obs" onclick="setMode('obstacle')">
+          <span class="icon">⬛</span>障礙物
+        </button>
+        <button class="mode-btn" id="btn-clear" onclick="setMode('clear')">
+          <span class="icon">✕</span>清除
+        </button>
+      </div>
+    </div>
+
+    <div class="status-box">
+      <div class="status-row"><span class="sl">起始點</span><span class="sv" id="st-start">—</span></div>
+      <div class="status-row"><span class="sl">目標點</span><span class="sv" id="st-goal">—</span></div>
+      <div class="status-row"><span class="sl">障礙物</span><span class="sv" id="st-obs">0 / <span id="st-obs-max">3</span></span></div>
+    </div>
+
+    <div class="reward-box">
+      <div class="reward-row"><span class="rl">每步懲罰</span><span class="rv" style="color:#f87171">−0.1</span></div>
+      <div class="reward-row"><span class="rl">到達目標</span><span class="rv" style="color:#4ade80">+1.0</span></div>
+      <div class="reward-row"><span class="rl">折扣因子 γ</span><span class="rv" style="color:var(--accent)">0.9</span></div>
+    </div>
+
+    <div class="steps">
+      <div class="step-dot active" id="dot-1">1</div>
+      <div class="step-line" id="line-1"></div>
+      <div class="step-dot" id="dot-2">2</div>
+      <div class="step-line" id="line-2"></div>
+      <div class="step-dot" id="dot-3">3</div>
+    </div>
+
+    <div class="step-btns">
+      <button class="btn btn-step1" id="btn-rand" onclick="genRandom()" disabled>
+        🎲 產生隨機策略
+      </button>
+      <button class="btn btn-step2" id="btn-eval" onclick="doEvaluate()" disabled>
+        ▶ 評估策略 + 價值迭代
+      </button>
+      <button class="btn btn-ghost" onclick="resetAll()">↺ 重置</button>
+    </div>
+
+    <div class="legend">
+      <div class="panel-title" style="margin-top:.05rem">圖例</div>
+      <div class="leg"><span class="swatch" style="background:rgba(34,197,94,.4);border:2px solid #22c55e"></span>起始點</div>
+      <div class="leg"><span class="swatch" style="background:rgba(239,68,68,.4);border:2px solid #ef4444"></span>目標點</div>
+      <div class="leg"><span class="swatch" style="background:rgba(40,45,60,.9);border:2px solid #2d3446"></span>障礙物</div>
+      <div class="leg"><span class="swatch" style="background:rgba(245,158,11,.2);border:2px solid #f59e0b"></span>最佳路徑</div>
+      <div class="leg"><span class="swatch" style="background:rgba(34,197,94,.2)"></span>高 V(s)</div>
+      <div class="leg"><span class="swatch" style="background:rgba(239,68,68,.2)"></span>低 V(s)</div>
+    </div>
+  </aside>
+
+  <div class="grids-area">
+    <div class="grid-section">
+      <div class="grid-section-title title-hw12">
+        <span class="grid-badge badge-hw12">HW1-2</span>
+        隨機策略（固定）→ 策略評估 V(s)
+      </div>
+      <div class="grid-wrap" id="grid-rand"></div>
+    </div>
+
+    <div class="grid-section">
+      <div class="grid-section-title title-hw13">
+        <span class="grid-badge badge-hw13">HW1-3</span>
+        價值迭代最佳策略 → 最佳路徑
+      </div>
+      <div class="grid-wrap" id="grid-opt"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// RL Constants
+// ═══════════════════════════════════════════════════════════════════
+const GAMMA       = 0.9;
+const THETA       = 1e-6;
+const REWARD_STEP = -0.1;
+const REWARD_GOAL = 1.0;
+const MAX_ITER    = 10000;
+const ACTIONS     = ['up','down','left','right'];
+const DELTA       = {up:[-1,0], down:[1,0], left:[0,-1], right:[0,1]};
+const ARROW       = {up:'↑', down:'↓', left:'←', right:'→'};
+
+// ═══════════════════════════════════════════════════════════════════
+// App State
+// ═══════════════════════════════════════════════════════════════════
+let n = 5;
+let mode = 'start';
+let startCell = null;   // [r,c]
+let goalCell  = null;   // [r,c]
+let obstacles = new Set();  // "r,c"
+const maxObs = () => n - 2;
+let savedRandPolicy = null;  // dict "r,c" -> action string
+
+// ═══════════════════════════════════════════════════════════════════
+// RL Core (runs in-browser, no backend)
+// ═══════════════════════════════════════════════════════════════════
+
+function transition(r, c, action) {
+  const [dr, dc] = DELTA[action];
+  const nr = r + dr, nc = c + dc;
+  if (nr >= 0 && nr < n && nc >= 0 && nc < n && !obstacles.has(`${nr},${nc}`))
+    return [nr, nc];
+  return [r, c];
+}
+
+function getReward(nr, nc) {
+  return (nr === goalCell[0] && nc === goalCell[1]) ? REWARD_GOAL : REWARD_STEP;
+}
+
+/** HW1-2: Generate a random policy (action per non-goal, non-obstacle cell) */
+function makeRandomPolicy() {
+  const policy = {};
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      const key = `${r},${c}`;
+      const isGoal = r === goalCell[0] && c === goalCell[1];
+      policy[key] = (isGoal || obstacles.has(key))
+        ? null
+        : ACTIONS[Math.floor(Math.random() * 4)];
+    }
+  }
+  return policy;
+}
+
+/** HW1-2: Iterative policy evaluation (synchronous Bellman update)
+ *  V[goal] = 0 (terminal state). Reward received on entering goal.
+ *  Neighbour: V = 1.0 + 0.9*0 = 1.0  |  Two away: V = -0.1 + 0.9*1.0 = 0.8
+ */
+function policyEvaluation(policy) {
+  const V = {};
+  for (let r = 0; r < n; r++)
+    for (let c = 0; c < n; c++)
+      V[`${r},${c}`] = 0.0;
+  // V[goal] = 0 — terminal, no further transitions from here
+
+  for (let iter = 0; iter < MAX_ITER; iter++) {
+    let delta = 0;
+    const newV = {...V};
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const key = `${r},${c}`;
+        const isGoal = r === goalCell[0] && c === goalCell[1];
+        if (obstacles.has(key) || isGoal) continue;
+        const a = policy[key];
+        if (!a) continue;
+        const [nr, nc] = transition(r, c, a);
+        const v = getReward(nr, nc) + GAMMA * V[`${nr},${nc}`];
+        delta = Math.max(delta, Math.abs(v - V[key]));
+        newV[key] = v;
+      }
+    }
+    Object.assign(V, newV);
+    if (delta < THETA) break;
+  }
+  return V;
+}
+
+/** HW1-3: Value iteration → optimal V* and optimal policy
+ *  V[goal] = 0 (terminal). Reward received on entering goal.
+ */
+function valueIteration() {
+  const V = {};
+  for (let r = 0; r < n; r++)
+    for (let c = 0; c < n; c++)
+      V[`${r},${c}`] = 0.0;
+  // V[goal] = 0 — terminal absorbing state
+
+  for (let iter = 0; iter < MAX_ITER; iter++) {
+    let delta = 0;
+    const newV = {...V};
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const key = `${r},${c}`;
+        const isGoal = r === goalCell[0] && c === goalCell[1];
+        if (obstacles.has(key) || isGoal) continue;
+        let best = -Infinity;
+        for (const a of ACTIONS) {
+          const [nr, nc] = transition(r, c, a);
+          const q = getReward(nr, nc) + GAMMA * V[`${nr},${nc}`];
+          if (q > best) best = q;
+        }
+        delta = Math.max(delta, Math.abs(best - V[key]));
+        newV[key] = best;
+      }
+    }
+    Object.assign(V, newV);
+    if (delta < THETA) break;
+  }
+
+  // Extract optimal policy
+  const optPolicy = {};
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      const key = `${r},${c}`;
+      const isGoal = r === goalCell[0] && c === goalCell[1];
+      if (obstacles.has(key) || isGoal) { optPolicy[key] = null; continue; }
+      let bestA = null, bestQ = -Infinity;
+      for (const a of ACTIONS) {
+        const [nr, nc] = transition(r, c, a);
+        const q = getReward(nr, nc) + GAMMA * V[`${nr},${nc}`];
+        if (q > bestQ) { bestQ = q; bestA = a; }
+      }
+      optPolicy[key] = bestA;
+    }
+  }
+  return { V, optPolicy };
+}
+
+/** Follow optimal policy from start to goal, return path [[r,c],...] */
+function findPath(optPolicy) {
+  const path = [[...startCell]];
+  let cur = [...startCell];
+  const visited = new Set([`${cur[0]},${cur[1]}`]);
+  for (let i = 0; i < n * n * 2; i++) {
+    if (cur[0] === goalCell[0] && cur[1] === goalCell[1]) break;
+    const a = optPolicy[`${cur[0]},${cur[1]}`];
+    if (!a) break;
+    const [nr, nc] = transition(cur[0], cur[1], a);
+    const nkey = `${nr},${nc}`;
+    if ((nr === cur[0] && nc === cur[1]) || visited.has(nkey)) break;
+    visited.add(nkey);
+    path.push([nr, nc]);
+    cur = [nr, nc];
+  }
+  return path;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Grid building
+// ═══════════════════════════════════════════════════════════════════
+function buildGrid(id, interactive) {
+  const ctr = document.getElementById(id);
+  ctr.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+  ctr.innerHTML = '';
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (interactive ? '' : ' readonly');
+      cell.id = `${id}-${r}-${c}`;
+      cell.innerHTML =
+        `<span class="cell-lbl">${r},${c}</span>` +
+        `<span class="cell-arrow"></span>` +
+        `<span class="cell-val"></span>`;
+      if (interactive) cell.addEventListener('click', () => handleClick(r, c));
+      ctr.appendChild(cell);
+    }
+  }
+}
+function buildBoth() { buildGrid('grid-rand', true); buildGrid('grid-opt', false); }
+
+const getR = (r,c) => document.getElementById(`grid-rand-${r}-${c}`);
+const getO = (r,c) => document.getElementById(`grid-opt-${r}-${c}`);
+function applyClass(r, c, cls, add) {
+  [getR(r,c), getO(r,c)].forEach(el => el && el.classList[add?'add':'remove'](cls));
+}
+const startKey = () => startCell ? `${startCell[0]},${startCell[1]}` : null;
+const goalKey  = () => goalCell  ? `${goalCell[0]},${goalCell[1]}`   : null;
+
+// ═══════════════════════════════════════════════════════════════════
+// Interactions
+// ═══════════════════════════════════════════════════════════════════
+function setN(val) {
+  n = val;
+  document.querySelectorAll('.n-btn').forEach(b => {
+    b.classList.toggle('active', +b.textContent === val);
+  });
+  document.getElementById('st-obs-max').textContent = maxObs();
+  resetAll();
+}
+
+function handleClick(r, c) {
+  const key = `${r},${c}`;
+  if (mode === 'clear') { clearCell(r,c); updateStatus(); checkReady(); return; }
+  if (mode === 'start') {
+    if (key === goalKey() || obstacles.has(key)) return;
+    if (startCell) applyClass(...startCell,'start',false);
+    startCell = [r,c]; applyClass(r,c,'start',true);
+  } else if (mode === 'goal') {
+    if (key === startKey() || obstacles.has(key)) return;
+    if (goalCell) applyClass(...goalCell,'goal',false);
+    goalCell = [r,c]; applyClass(r,c,'goal',true);
+  } else if (mode === 'obstacle') {
+    if (key === startKey() || key === goalKey()) return;
+    if (obstacles.has(key)) { obstacles.delete(key); applyClass(r,c,'obstacle',false); }
+    else if (obstacles.size < maxObs()) { obstacles.add(key); applyClass(r,c,'obstacle',true); }
+    else { toast(`最多只能設 ${maxObs()} 個障礙物`); return; }
+  }
+  savedRandPolicy = null;
+  updateStatus(); checkReady();
+}
+
+function clearCell(r, c) {
+  const key = `${r},${c}`;
+  if (startKey()===key){ startCell=null; applyClass(r,c,'start',false); }
+  if (goalKey() ===key){ goalCell =null; applyClass(r,c,'goal', false); }
+  if (obstacles.has(key)){ obstacles.delete(key); applyClass(r,c,'obstacle',false); }
+}
+
+const M_CLS = {start:'m-start',goal:'m-goal',obstacle:'m-obs',clear:'m-clear'};
+const M_BTN = {start:'btn-start',goal:'btn-goal',obstacle:'btn-obs',clear:'btn-clear'};
+function setMode(m) {
+  mode = m;
+  Object.keys(M_BTN).forEach(k => {
+    document.getElementById(M_BTN[k]).className = 'mode-btn'+(k===m?' '+M_CLS[k]:'');
+  });
+}
+
+function updateStatus() {
+  document.getElementById('st-start').textContent = startCell?`(${startCell[0]},${startCell[1]})`:'—';
+  document.getElementById('st-goal').textContent  = goalCell ?`(${goalCell[0]},${goalCell[1]})`  :'—';
+  document.getElementById('st-obs').innerHTML = `${obstacles.size} / <span id="st-obs-max">${maxObs()}</span>`;
+}
+
+function checkReady() {
+  const ready = !!(startCell && goalCell);
+  document.getElementById('btn-rand').disabled = !ready;
+  document.getElementById('btn-eval').disabled = !ready || !savedRandPolicy;
+}
+
+function setStep(s) {
+  for (let i=1;i<=3;i++) {
+    document.getElementById(`dot-${i}`).className =
+      'step-dot'+(i<s?' done':i===s?' active':'');
+  }
+  for (let i=1;i<=2;i++) {
+    document.getElementById(`line-${i}`).className = 'step-line'+(i<s?' done':'');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Heatmap helper
+// ═══════════════════════════════════════════════════════════════════
+function lerp(a,b,t){ return Math.round(a+(b-a)*t); }
+function heatBg(val, minV, maxV) {
+  const t = (val - minV) / (maxV - minV + 1e-9);
+  return `rgba(${lerp(239,34,t)},${lerp(68,197,t)},${lerp(68,94,t)},0.26)`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Step 1: Generate random policy
+// ═══════════════════════════════════════════════════════════════════
+function genRandom() {
+  if (!startCell || !goalCell) return;
+  savedRandPolicy = makeRandomPolicy();
+
+  // Show arrows on rand grid, clear values
+  for (let r=0;r<n;r++) {
+    for (let c=0;c<n;c++) {
+      const key=`${r},${c}`, cell=getR(r,c);
+      const arrowEl=cell.querySelector('.cell-arrow');
+      const valEl  =cell.querySelector('.cell-val');
+      const isGoal = r===goalCell[0]&&c===goalCell[1];
+      const isObs  = obstacles.has(key);
+      if (isObs){ arrowEl.textContent=''; valEl.textContent=''; cell.style.background=''; continue; }
+      if (isGoal){ arrowEl.textContent='★'; valEl.textContent=''; cell.style.background=''; continue; }
+      arrowEl.textContent = ARROW[savedRandPolicy[key]] || '';
+      valEl.textContent   = '';
+      cell.style.background = '';
+    }
+  }
+  // Clear opt grid
+  for (let r=0;r<n;r++) for (let c=0;c<n;c++) {
+    const cell=getO(r,c);
+    cell.querySelector('.cell-arrow').textContent='';
+    cell.querySelector('.cell-val').textContent='';
+    cell.style.background='';
+    cell.classList.remove('on-path');
+  }
+
+  setStep(2); checkReady();
+  toast('隨機策略已產生 — 請按「評估策略」');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Step 2: Policy evaluation + Value iteration
+// ═══════════════════════════════════════════════════════════════════
+function doEvaluate() {
+  if (!startCell || !goalCell || !savedRandPolicy) return;
+
+  // HW1-2: policy evaluation on the fixed random policy
+  const Vrand = policyEvaluation(savedRandPolicy);
+
+  // HW1-3: value iteration
+  const { V: Vopt, optPolicy } = valueIteration();
+  const path = findPath(optPolicy);
+  const pathSet = new Set(path.map(([r,c])=>`${r},${c}`));
+
+  // Render HW1-2
+  {
+    const vals = Object.values(Vrand).filter(v => isFinite(v));
+    const minV = Math.min(...vals), maxV = Math.max(...vals);
+    for (let r=0;r<n;r++) {
+      for (let c=0;c<n;c++) {
+        const key=`${r},${c}`, cell=getR(r,c);
+        const isObs  = obstacles.has(key);
+        const isGoal = r===goalCell[0]&&c===goalCell[1];
+        if (isObs) continue;
+        if (isGoal) continue;  // goal: keep ★, no value
+        cell.querySelector('.cell-val').textContent = Vrand[key].toFixed(2);
+        cell.style.background = heatBg(Vrand[key], minV, maxV);
+      }
+    }
+  }
+
+  // Render HW1-3
+  {
+    const vals = Object.values(Vopt).filter(v => isFinite(v));
+    const minV = Math.min(...vals), maxV = Math.max(...vals);
+    for (let r=0;r<n;r++) {
+      for (let c=0;c<n;c++) {
+        const key=`${r},${c}`, cell=getO(r,c);
+        const arrowEl=cell.querySelector('.cell-arrow');
+        const valEl  =cell.querySelector('.cell-val');
+        const isObs  = obstacles.has(key);
+        const isGoal = r===goalCell[0]&&c===goalCell[1];
+        if (isObs){ arrowEl.textContent=''; valEl.textContent=''; cell.style.background=''; cell.classList.remove('on-path'); continue; }
+        if (isGoal){ arrowEl.textContent='★'; valEl.textContent=''; cell.classList.toggle('on-path',pathSet.has(key)); continue; }
+        arrowEl.textContent = ARROW[optPolicy[key]] || '?';
+        valEl.textContent   = Vopt[key].toFixed(2);
+        cell.style.background = heatBg(Vopt[key], minV, maxV);
+        cell.classList.toggle('on-path', pathSet.has(key));
+      }
+    }
+  }
+
+  setStep(3); checkReady();
+  const reached = path.length>1 && path[path.length-1][0]===goalCell[0] && path[path.length-1][1]===goalCell[1];
+  toast(reached
+    ? `✓ 完成！最佳路徑 ${path.length} 步到達目標`
+    : '✓ 完成（無法找到到達目標的路徑）');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Reset
+// ═══════════════════════════════════════════════════════════════════
+function resetAll() {
+  startCell=null; goalCell=null; obstacles=new Set(); savedRandPolicy=null;
+  buildBoth(); setMode('start'); updateStatus(); checkReady(); setStep(1);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Toast
+// ═══════════════════════════════════════════════════════════════════
+let toastTimer;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),3200);
+}
+
+// Boot
+buildBoth();
+</script>
+</body>
+</html>
