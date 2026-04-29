@@ -13,7 +13,7 @@ hw1/
 ├── README.md
 └── templates/
     ├── index.html          # Flask 版前端（需搭配後端）
-    └── standalone.html     # 純前端版（無需任何後端）
+├──index.html     # 純前端版（無需任何後端）
 ```
 
 ---
